@@ -1,0 +1,123 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-mode-checker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/component: monitoring
+
+---
+# Read-only access to Application CRs — nothing else
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: service-mode-checker
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: service-mode-checker
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: service-mode-checker
+subjects:
+  - kind: ServiceAccount
+    name: service-mode-checker
+    namespace: argocd
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-mode-checker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: service-mode-checker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: service-mode-checker
+    spec:
+      serviceAccountName: service-mode-checker
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: checker
+          # Build and push to your registry, then update this:
+          image: registry.example.com/argocd-service-mode-checker:latest
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+            - name: ARGOCD_NAMESPACE
+              value: "argocd"
+            # Optional: scope to specific apps by label
+            # - name: LABEL_SELECTOR
+            #   value: "app.kubernetes.io/instance=my-appset"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-mode-checker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/component: monitoring
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: service-mode-checker
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

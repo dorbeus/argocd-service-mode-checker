@@ -1,0 +1,44 @@
+---
+# Optional: if you want Prometheus to probe the endpoint
+# Requires prometheus-operator / blackbox-exporter
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: service-mode-checker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+spec:
+  interval: 60s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - service-mode-checker.argocd.svc/status
+
+---
+# Alert if the /status endpoint returns non-200 for more than 30 minutes
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: service-mode-checker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: service-mode-checker
+spec:
+  groups:
+    - name: argocd-service-mode
+      rules:
+        - alert: ArgoCD_ServiceModeActive
+          # probe_success == 0 means non-2xx response
+          expr: probe_success{job="service-mode-checker"} == 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "One or more ArgoCD apps are still in service mode"
+            description: >-
+              The service-mode-checker endpoint has been returning non-200
+              for over 30 minutes. Check: curl service-mode-checker.argocd.svc/status
