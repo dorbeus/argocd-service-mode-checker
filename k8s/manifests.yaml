@@ -65,7 +65,7 @@ spec:
       containers:
         - name: checker
           # Build and push to your registry, then update this:
-          image: registry.example.com/argocd-service-mode-checker:latest
+          image: ghcr.io/dorbeus/argocd-service-mode-checker:main
           ports:
             - name: http
               containerPort: 8080
