@@ -171,8 +171,9 @@ def check_service_mode():
 
         # Build detail about what's missing
         issues = []
+        log.info(name + ": " + json.dumps(automated))
         if automated is None:
-            issues.append("auto-sync disabled")
+            issues.append("No automated sync policy defined")
         else:
             if automated.get("enabled", False):
                 issues.append("auto-sync disabled")
