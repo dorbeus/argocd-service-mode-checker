@@ -1,14 +1,16 @@
 # ArgoCD Status Checker
 
-A lightweight in-cluster HTTP service that monitors ArgoCD Application health, sync status, and auto-sync configuration — giving you simple HTTP endpoints to poll or alert on.
+A lightweight in-cluster HTTP service that monitors ArgoCD Application health, sync status, and auto-sync configuration. Exposes simple HTTP endpoints you can poll from CI, alerting, or dashboards.
 
 ## Endpoints
 
 | Path | Description |
 |---|---|
-| `GET /healthz` | Liveness/readiness probe (always `200 ok`) |
-| `GET /auto-sync` | `200` if all apps have auto-sync + selfHeal enabled, `409` if any are in service mode |
-| `GET /apps` | `200` if all apps are Healthy + Synced, `409` listing any with issues |
+| `GET /healthz` | Liveness/readiness probe — always `200 ok` |
+| `GET /auto-sync` | `200` if all apps have auto-sync, selfHeal, and prune enabled; `409` if any are missing |
+| `GET /apps` | `200` if all apps are `Healthy` and `Synced`; `409` listing any with issues |
+
+All endpoints return JSON. Both `/auto-sync` and `/apps` follow the same response structure.
 
 ## Response examples
 
@@ -34,7 +36,7 @@ One or more apps in service mode:
   "affectedApps": [
     {
       "name": "my-app-frontend",
-      "issues": ["auto-sync disabled"],
+      "issues": ["No automated sync policy defined"],
       "serviceMode": {
         "enteredAt": "2026-05-14T08:30:00Z",
         "reason": "investigating pod crashloop"
@@ -42,11 +44,13 @@ One or more apps in service mode:
     },
     {
       "name": "my-app-backend",
-      "issues": ["selfHeal disabled"]
+      "issues": ["selfHeal disabled", "prune disabled"]
     }
   ]
 }
 ```
+
+Possible issues per app: `No automated sync policy defined`, `auto-sync disabled`, `selfHeal disabled`, `prune disabled`.
 
 ### `GET /apps`
 
@@ -80,12 +84,23 @@ One or more apps with issues:
 }
 ```
 
-The `serviceMode` object appears on any affected app that carries `service-mode/entered-at` and `service-mode/reason` annotations.
+Possible issues per app: `health: <status> (<message>)`, `sync: <status>`.
+
+### Error response (both endpoints)
+
+```json
+{
+  "status": "error",
+  "message": "ServiceAccount token not found — is the pod running in-cluster?"
+}
+```
+
+The `serviceMode` object appears on any affected app that carries `service-mode/entered-at` and `service-mode/reason` annotations (see [Service mode annotations](#service-mode-annotations)).
 
 ## Prerequisites
 
-- A Kubernetes cluster with ArgoCD installed
-- For auto-sync runtime patching to survive ApplicationSet reconciliation, add `ignoreApplicationDifferences` for `/spec/syncPolicy` to your ApplicationSet (see below)
+- Kubernetes cluster with ArgoCD installed
+- For auto-sync runtime patches to survive ApplicationSet reconciliation, configure `ignoreApplicationDifferences` on your ApplicationSet (see [ApplicationSet setup](#applicationset-setup))
 
 ## Deployment
 
@@ -95,12 +110,12 @@ The `serviceMode` object appears on any affected app that carries `service-mode/
 kubectl apply -f k8s/manifests.yaml
 ```
 
-This creates:
+Creates:
 
-- A `ServiceAccount` with read-only access to `applications.argoproj.io`
-- A `ClusterRole` and `ClusterRoleBinding` (minimal RBAC — only `get` and `list` on Applications)
-- A `Deployment` running the checker pod
-- A `ClusterIP` Service on port 80
+- `ServiceAccount` with read-only access to `applications.argoproj.io`
+- `ClusterRole` + `ClusterRoleBinding` — only `get` and `list` on Applications
+- `Deployment` running the checker pod
+- `ClusterIP` Service on port 80
 
 ### 2. (Optional) Prometheus monitoring
 
@@ -121,11 +136,11 @@ Requires prometheus-operator and blackbox-exporter.
 |---|---|---|
 | `PORT` | `8080` | HTTP listen port |
 | `ARGOCD_NAMESPACE` | `argocd` | Namespace to query for Application CRs |
-| `LABEL_SELECTOR` | *(empty)* | Optional label selector to scope which Applications are checked |
+| `LABEL_SELECTOR` | *(empty)* | Optional label selector to scope which Applications are checked (e.g. `app.kubernetes.io/instance=my-appset`) |
 
 ## Service mode annotations
 
-Annotate apps when entering service mode for audit trail visibility in the API responses:
+Annotate apps when disabling auto-sync to surface context in the `/auto-sync` response:
 
 ```bash
 kubectl annotate application <app-name> -n argocd \
@@ -178,6 +193,7 @@ From your workstation:
 
 ```bash
 kubectl port-forward -n argocd svc/argocd-status-checker 8080:80
+curl -s localhost:8080/auto-sync | jq .
 curl -s localhost:8080/apps | jq .
 ```
 
