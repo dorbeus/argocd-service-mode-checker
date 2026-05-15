@@ -1,13 +1,13 @@
 ---
-# Optional: if you want Prometheus to probe the endpoint
+# Optional: if you want Prometheus to probe the endpoints
 # Requires prometheus-operator / blackbox-exporter
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   namespace: argocd
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
 spec:
   interval: 60s
   module: http_2xx
@@ -16,29 +16,39 @@ spec:
   targets:
     staticConfig:
       static:
-        - service-mode-checker.argocd.svc/status
+        - argocd-status-checker.argocd.svc/auto-sync
+        - argocd-status-checker.argocd.svc/apps
 
 ---
-# Alert if the /status endpoint returns non-200 for more than 30 minutes
+# Alert if either endpoint returns non-200 for more than 30 minutes
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   namespace: argocd
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
 spec:
   groups:
-    - name: argocd-service-mode
+    - name: argocd-status
       rules:
         - alert: ArgoCD_ServiceModeActive
-          # probe_success == 0 means non-2xx response
-          expr: probe_success{job="service-mode-checker"} == 0
+          expr: probe_success{job="argocd-status-checker", instance=~".*/auto-sync"} == 0
           for: 30m
           labels:
             severity: warning
           annotations:
-            summary: "One or more ArgoCD apps are still in service mode"
+            summary: "One or more ArgoCD apps have auto-sync disabled"
             description: >-
-              The service-mode-checker endpoint has been returning non-200
-              for over 30 minutes. Check: curl service-mode-checker.argocd.svc/status
+              The /auto-sync endpoint has been returning non-200 for over 30 minutes.
+              Check: curl argocd-status-checker.argocd.svc/auto-sync
+        - alert: ArgoCD_AppsUnhealthy
+          expr: probe_success{job="argocd-status-checker", instance=~".*/apps"} == 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "One or more ArgoCD apps are not Healthy or Synced"
+            description: >-
+              The /apps endpoint has been returning non-200 for over 30 minutes.
+              Check: curl argocd-status-checker.argocd.svc/apps

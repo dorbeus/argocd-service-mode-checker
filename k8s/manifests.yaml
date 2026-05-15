@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   namespace: argocd
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
     app.kubernetes.io/component: monitoring
 
 ---
@@ -13,9 +13,9 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
 rules:
   - apiGroups: ["argoproj.io"]
     resources: ["applications"]
@@ -25,38 +25,38 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: service-mode-checker
+  name: argocd-status-checker
 subjects:
   - kind: ServiceAccount
-    name: service-mode-checker
+    name: argocd-status-checker
     namespace: argocd
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   namespace: argocd
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
     app.kubernetes.io/component: monitoring
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: service-mode-checker
+      app.kubernetes.io/name: argocd-status-checker
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: service-mode-checker
+        app.kubernetes.io/name: argocd-status-checker
     spec:
-      serviceAccountName: service-mode-checker
+      serviceAccountName: argocd-status-checker
       automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
@@ -65,7 +65,7 @@ spec:
       containers:
         - name: checker
           # Build and push to your registry, then update this:
-          image: ghcr.io/dorbeus/argocd-service-mode-checker:main
+          image: ghcr.io/dorbeus/argocd-argocd-status-checker:main
           pullPolicy: Always
           ports:
             - name: http
@@ -108,15 +108,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: service-mode-checker
+  name: argocd-status-checker
   namespace: argocd
   labels:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
     app.kubernetes.io/component: monitoring
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: service-mode-checker
+    app.kubernetes.io/name: argocd-status-checker
   ports:
     - name: http
       port: 80

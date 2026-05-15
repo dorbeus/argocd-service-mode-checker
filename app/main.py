@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ArgoCD Service Mode Checker
+ArgoCD Status Checker
 
 Endpoints:
   GET /healthz    — liveness probe, always 200
