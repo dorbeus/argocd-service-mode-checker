@@ -201,7 +201,7 @@ This tells the ApplicationSet controller not to overwrite `syncPolicy` if it has
 
 ## Project structure
 
-```
+```text
 ├── app/
 │   ├── main.py          # Python HTTP server (stdlib only, no dependencies)
 │   └── Dockerfile        # Alpine-based image

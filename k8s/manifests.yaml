@@ -66,6 +66,7 @@ spec:
         - name: checker
           # Build and push to your registry, then update this:
           image: ghcr.io/dorbeus/argocd-service-mode-checker:main
+          pullPolicy: Always
           ports:
             - name: http
               containerPort: 8080
