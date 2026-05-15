@@ -175,7 +175,7 @@ def check_service_mode():
         if automated is None:
             issues.append("No automated sync policy defined")
         else:
-            if automated.get("enabled", False) == False:
+            if automated.get("enabled", True) == False:
                 issues.append("auto-sync disabled")
             if automated.get("selfHeal", False) == False:
                 issues.append("selfHeal disabled")
